@@ -33,6 +33,7 @@
  */
 use OCP\API;
 use OCP\AppFramework\Http;
+use OC\Authentication\Exceptions\AccountCheckException;
 
 class OC_API {
 
@@ -331,7 +332,11 @@ class OC_API {
 		$loggedIn = $userSession->isLoggedIn();
 		if ($loggedIn === true) {
 			if (\OC::$server->getTwoFactorAuthManager()->needsSecondFactor()) {
-				// Do not allow access to OCS until the 2FA challenge was solved successfully
+				return false;
+			}
+			try {
+				\OC::$server->getAccountModuleManager()->check($userSession->getUser());
+			} catch (AccountCheckException $ex) {
 				return false;
 			}
 			if ($userSession->verifyAuthHeaders($request)) {
@@ -342,7 +347,7 @@ class OC_API {
 					\OC_Util::setupFS(\OC_User::getUser());
 					self::$isLoggedIn = true;
 
-					return OC_User::getUser();
+					return \OC_User::getUser();
 				}
 
 				return false;
@@ -361,12 +366,17 @@ class OC_API {
 			} else {
 				return false;
 			}
+			try {
+				\OC::$server->getAccountModuleManager()->check($userSession->getUser());
+			} catch (AccountCheckException $ex) {
+				return false;
+			}
 			// initialize the user's filesystem
 			\OC_Util::setupFS(\OC_User::getUser());
 			self::$isLoggedIn = true;
 
 			return \OC_User::getUser();
-		} catch (\OC\User\LoginException $e) {
+		} catch (\OC\User\LoginException $ex) {
 			return false;
 		}
 	}
